@@ -369,11 +369,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Determina a URL da API dinamicamente (produção online vs desenvolvimento local)
-                const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
-                const apiUrl = (isLocalDev && window.location.port !== '3000')
+                // Determina a URL da API dinamicamente (desenvolvimento local vs produção no Render)
+                const isLocalDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5500';
+                const apiUrl = isLocalDev
                     ? 'http://localhost:3000/api/processar-pagamento'
-                    : '/api/processar-pagamento';
+                    : 'https://bolos-caseirinhos.onrender.com/api/processar-pagamento';
 
                 // Chamada de API para o Servidor Backend Node.js
                 const response = await fetch(apiUrl, {

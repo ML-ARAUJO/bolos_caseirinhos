@@ -80,6 +80,7 @@ app.post('/api/processar-pagamento', async (req, res) => {
                 transaction_amount: Number(transaction_amount),
                 description: description || 'Pedido Bolos Caseirinhos',
                 payment_method_id: 'pix',
+                notification_url: 'https://bolos-caseirinhos.onrender.com/api/webhooks/mercadopago',
                 payer: {
                     email: payer.email,
                     first_name: payer.first_name,
@@ -151,22 +152,26 @@ app.post('/api/processar-pagamento', async (req, res) => {
 // 4. Webhook do Mercado Pago (Atualização automática de status no Supabase ao pagar o PIX)
 app.post('/api/webhooks/mercadopago', async (req, res) => {
     try {
-        const { type, data } = req.body;
+        const { type, data, action } = req.body || {};
+        const paymentId = data?.id || req.body?.id || req.query?.['data.id'] || req.query?.id;
+        const eventType = type || action || req.query?.type || req.query?.topic;
 
-        if (type === 'payment' && data?.id && paymentClient && supabase) {
-            const paymentInfo = await paymentClient.get({ id: data.id });
-            console.log(`🔔 Webhook recebido - Pagamento ${data.id} Status: ${paymentInfo.status}`);
+        console.log('🔔 Notificação Webhook recebida:', { eventType, paymentId });
+
+        if (paymentId && paymentClient && supabase) {
+            const paymentInfo = await paymentClient.get({ id: paymentId });
+            console.log(`📊 Status atualizado do Pagamento ${paymentId}: ${paymentInfo.status}`);
 
             if (paymentInfo.status === 'approved') {
                 const { error } = await supabase
                     .from('pedidos')
                     .update({ status_pagamento: 'pago' })
-                    .eq('mercadopago_id', String(data.id));
+                    .eq('mercadopago_id', String(paymentId));
 
                 if (error) {
                     console.error('❌ Erro ao atualizar status no Supabase via Webhook:', error.message);
                 } else {
-                    console.log(`🎉 Pedido MP #${data.id} atualizado para 'pago' no Supabase!`);
+                    console.log(`🎉 Pedido MP #${paymentId} atualizado para 'pago' no Supabase!`);
                 }
             }
         }

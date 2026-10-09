@@ -369,8 +369,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                // Chamada de API para o Servidor Backend Node.js local
-                const response = await fetch('http://localhost:3000/api/processar-pagamento', {
+                // Determina a URL da API dinamicamente (produção online vs desenvolvimento local)
+                const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:';
+                const apiUrl = (isLocalDev && window.location.port !== '3000')
+                    ? 'http://localhost:3000/api/processar-pagamento'
+                    : '/api/processar-pagamento';
+
+                // Chamada de API para o Servidor Backend Node.js
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

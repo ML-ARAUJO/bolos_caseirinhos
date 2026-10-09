@@ -4,12 +4,17 @@ const cors = require('cors');
 const { MercadoPagoConfig, Payment } = require('mercadopago');
 const { createClient } = require('@supabase/supabase-js');
 
+const path = require('path');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Configuração de Middlewares
 app.use(cors());
 app.use(express.json());
+
+// Servir arquivos estáticos do Front-end (index.html, style.css, app.js, img/)
+app.use(express.static(path.join(__dirname, '..')));
 
 // 1. Inicialização do Mercado Pago
 const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;

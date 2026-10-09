@@ -76,7 +76,28 @@ bolodadanih/
    O servidor estará rodando em `http://localhost:3000`.
 
 ### 4. Executar o Front-end
-Abra o arquivo [`index.html`](index.html) diretamente no seu navegador ou utilize a extensão **Live Server** do VS Code.
+Abra o arquivo [`index.html`](index.html) diretamente no seu navegador, ou acesse `http://localhost:3000` após iniciar o backend (o servidor Express agora serve o front-end automaticamente).
+
+---
+
+## ☁️ Como Fazer o Deploy Online (Grátis no Render)
+
+O projeto está configurado para rodar como uma aplicação Full-stack única. O **[Render](https://render.com)** é gratuito e fornece URL HTTPS pronta:
+
+1. Suba o projeto para o seu GitHub.
+2. Crie uma conta gratuita em **[render.com](https://render.com)**.
+3. No painel, clique em **New +** > **Web Service**.
+4. Conecte o repositório do seu GitHub.
+5. Deixe as configurações:
+   - **Environment**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+6. Na seção **Environment Variables**, adicione as mesmas variáveis do seu `.env`:
+   - `MERCADOPAGO_ACCESS_TOKEN` = *(seu token do Mercado Pago)*
+   - `SUPABASE_URL` = *(sua URL do Supabase)*
+   - `SUPABASE_SECRET_KEY` = *(sua chave secreta do Supabase)*
+7. Clique em **Create Web Service**.
+8. Em poucos minutos, sua loja estará online em um link público (ex: `https://bolos-caseirinhos.onrender.com`)!
 
 ---
 

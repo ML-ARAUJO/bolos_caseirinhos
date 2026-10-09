@@ -1,0 +1,17 @@
+{
+  "name": "bolos-caseirinhos",
+  "version": "1.0.0",
+  "description": "E-commerce Bolos Caseirinhos com Mercado Pago e Supabase",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "cd backend && npm run dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
+    "mercadopago": "^2.13.0"
+  }
+}

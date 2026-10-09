@@ -1,0 +1,21 @@
+{
+  "name": "backend-bolos-caseirinhos",
+  "version": "1.0.0",
+  "description": "Backend Node.js para integração com API do Mercado Pago",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.3",
+    "mercadopago": "^2.13.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

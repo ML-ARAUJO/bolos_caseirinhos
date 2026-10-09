@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caseirinhos - Pedido de Bolo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header class="header">
+        <h1>Bolos Caseirinhos</h1>
+        <p>Escolha seu bolo favorito e faça sua encomenda!</p>
+    </header>
+
+    <main id="iContainer" class="container">
+        <!-- Controle de Visualização (Lista ou Galeria/Grade) -->
+        <div class="view-options">
+            <span class="view-label">Modo de Exibição:</span>
+            <div class="view-buttons">
+                <button type="button" id="btnModoLista" class="btn-view active" title="Visualização em Lista" aria-label="Visualização em Lista">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="8" y1="6" x2="21" y2="6"></line>
+                        <line x1="8" y1="12" x2="21" y2="12"></line>
+                        <line x1="8" y1="18" x2="21" y2="18"></line>
+                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                </button>
+                <button type="button" id="btnModoGrade" class="btn-view" title="Visualização em Galeria/Grade" aria-label="Visualização em Galeria/Grade">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Catálogo de bolos inserido via JavaScript -->
+        <div id="iListaBolos" class="listaBolos modo-lista"></div>
+
+        <!-- Resumo do Pedido e Botão para Checkout -->
+        <section class="resumoPedido">
+            <div class="totalGeralContainer">
+                <span>Total do Pedido:</span>
+                <strong id="iTotalGeral">R$ 0,00</strong>
+            </div>
+            <button type="button" id="iBtnComprar" class="btnPedido">Continuar para pagamento</button>
+        </section>
+    </main>
+
+    <!-- Modal de Checkout & Pagamento Mercado Pago -->
+    <div id="iModalCheckout" class="modal-checkout hidden" role="dialog" aria-labelledby="modalTitulo">
+        <div class="modal-conteudo">
+            <div class="modal-header">
+                <h2 id="modalTitulo">Finalizar Pedido</h2>
+                <button type="button" id="btnFecharModal" class="btn-fechar" aria-label="Fechar modal">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Resumo dos itens do carrinho -->
+                <div class="resumo-carrinho-modal">
+                    <h3>Resumo dos Itens</h3>
+                    <ul id="listaItensCheckout" class="lista-itens-checkout"></ul>
+                    <div class="total-checkout">
+                        <span>Valor Total:</span>
+                        <strong id="totalCheckoutValor">R$ 0,00</strong>
+                    </div>
+                </div>
+
+                <!-- Formulário do Cliente -->
+                <form id="formCheckout" class="form-checkout">
+                    <h3>Dados do Comprador</h3>
+                    <div class="input-group">
+                        <label for="clienteNome">Nome Completo *</label>
+                        <input type="text" id="clienteNome" placeholder="Ex: Maria Silva" required>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="clienteEmail">E-mail *</label>
+                            <input type="email" id="clienteEmail" placeholder="maria@email.com" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="clienteCPF">CPF *</label>
+                            <input type="text" id="clienteCPF" placeholder="000.000.000-00" required>
+                        </div>
+                    </div>
+
+                    <h3>Endereço de Entrega</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="clienteCEP">CEP *</label>
+                            <input type="text" id="clienteCEP" placeholder="00000-000" required>
+                        </div>
+                        <div class="input-group flex-2">
+                            <label for="clienteRua">Rua / Logradouro *</label>
+                            <input type="text" id="clienteRua" placeholder="Rua das Flores" required>
+                        </div>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="clienteNumero">Número *</label>
+                            <input type="text" id="clienteNumero" placeholder="123" required>
+                        </div>
+                        <div class="input-group flex-2">
+                            <label for="clienteBairro">Bairro *</label>
+                            <input type="text" id="clienteBairro" placeholder="Centro" required>
+                        </div>
+                    </div>
+
+                    <!-- Escolha do Método de Pagamento -->
+                    <h3>Forma de Pagamento (Mercado Pago)</h3>
+                    <div class="payment-tabs">
+                        <button type="button" id="tabPix" class="tab-btn active">
+                            <span class="icon">⚡</span> PIX (Aprovação Instantânea)
+                        </button>
+                        <button type="button" id="tabCartao" class="tab-btn">
+                            <span class="icon">💳</span> Cartão de Crédito
+                        </button>
+                    </div>
+
+                    <!-- Painel PIX -->
+                    <div id="painelPix" class="payment-panel">
+                        <p class="pix-info">Ao confirmar, será gerada a chave <strong>PIX Copia e Cola</strong> e o <strong>QR Code</strong> para pagamento via aplicativo do seu banco.</p>
+                        
+                        <!-- Imagem do QR Code PIX -->
+                        <div id="containerQrCodeImg" class="container-qrcode-img hidden">
+                            <label>Escaneie o QR Code pelo app do seu banco:</label>
+                            <div class="qrcode-wrapper">
+                                <img id="imgQrCodePix" src="" alt="QR Code PIX para Pagamento">
+                            </div>
+                        </div>
+
+                        <!-- Chave PIX Copia e Cola -->
+                        <div id="areaChavePix" class="area-chave-pix hidden">
+                            <label>Ou use o Código PIX Copia e Cola:</label>
+                            <div class="pix-copy-wrapper">
+                                <input type="text" id="inputPixCodigo" readonly>
+                                <button type="button" id="btnCopiarPix" class="btn-copiar">Copiar</button>
+                            </div>
+                            <span id="msgPixCopiado" class="msg-copiado hidden">Código copiado com sucesso!</span>
+                        </div>
+                    </div>
+
+                    <!-- Painel Cartão -->
+                    <div id="painelCartao" class="payment-panel hidden">
+                        <div class="input-group">
+                            <label for="cartaoNumero">Número do Cartão *</label>
+                            <input type="text" id="cartaoNumero" placeholder="0000 0000 0000 0000">
+                        </div>
+                        <div class="input-group">
+                            <label for="cartaoTitular">Nome impresso no Cartão *</label>
+                            <input type="text" id="cartaoTitular" placeholder="MARIA SILVA">
+                        </div>
+                        <div class="input-row">
+                            <div class="input-group">
+                                <label for="cartaoValidade">Validade *</label>
+                                <input type="text" id="cartaoValidade" placeholder="MM/AA">
+                            </div>
+                            <div class="input-group">
+                                <label for="cartaoCVV">CVV *</label>
+                                <input type="text" id="cartaoCVV" placeholder="123">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="cartaoParcelas">Parcelamento *</label>
+                            <select id="cartaoParcelas">
+                                <option value="1">1x sem juros</option>
+                                <option value="2">2x sem juros</option>
+                                <option value="3">3x sem juros</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btnFinalizarPagamento" class="btn-finalizar">
+                        Confirmar e Pagar com Mercado Pago
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rodapé -->
+    <footer class="footer">
+        <p>&copy; 2026 Bolos Caseirinhos. Todos os direitos reservados.</p>
+        <p>Feito com carinho 🍰 | Pagamentos 100% seguros</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

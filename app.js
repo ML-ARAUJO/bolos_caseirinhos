@@ -47,8 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
         cenouDePote: 0
     };
 
-    // Método de pagamento selecionado (padrão: pix)
-    let metodoPagamento = 'pix';
+    // Método de pagamento selecionado (nulo: nenhum pré-selecionado)
+    let metodoPagamento = null;
 
     // Elementos do DOM mapeados pelos IDs do HTML
     const listaBolosContainer = document.getElementById('iListaBolos');
@@ -312,9 +312,8 @@ document.addEventListener('DOMContentLoaded', () => {
         formCheckout.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            if (metodoPagamento === 'cartao') {
-                alert('ℹ️ No momento o pagamento online está habilitado exclusivamente via PIX (Aprovação Instantânea). Selecionando PIX para você...');
-                if (tabPix) tabPix.click();
+            if (!metodoPagamento) {
+                alert('⚠️ Por favor, selecione uma forma de pagamento (PIX ou Cartão de Crédito).');
                 return;
             }
 

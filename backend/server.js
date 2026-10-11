@@ -81,20 +81,26 @@ app.post('/api/processar-pagamento', async (req, res) => {
         let paymentStatus = 'pending';
 
         // 1. Tenta gerar via Orders API (/v1/orders) - padrão do novo Checkout Transparente via Orders
+        let ordersErrorDetail = null;
         try {
             console.log('🔄 Tentando criar PIX via Orders API (/v1/orders)...');
+            const idempotencyKey = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+            const totalAmountStr = Number(transaction_amount).toFixed(2);
+
+            // De acordo com a documentação oficial para teste de PIX no Orders API:
+            // payer.email deve ser test_user_br@testuser.com e first_name deve ser 'APRO'
             const orderPayload = {
                 type: 'online',
                 external_reference: `PEDIDO-${Date.now()}`,
-                total_amount: Number(transaction_amount).toFixed(2),
+                total_amount: totalAmountStr,
                 payer: {
-                    email: payer.email || 'test_user_br@testuser.com',
-                    first_name: payer.first_name || 'APRO'
+                    email: 'test_user_br@testuser.com',
+                    first_name: 'APRO'
                 },
                 transactions: {
                     payments: [
                         {
-                            amount: Number(transaction_amount).toFixed(2),
+                            amount: totalAmountStr,
                             payment_method: {
                                 id: 'pix',
                                 type: 'bank_transfer'
@@ -104,19 +110,23 @@ app.post('/api/processar-pagamento', async (req, res) => {
                 }
             };
 
+            console.log('📦 Enviando payload para /v1/orders:', JSON.stringify(orderPayload));
+
             const orderRes = await fetch('https://api.mercadopago.com/v1/orders', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`
+                    'Authorization': `Bearer ${accessToken}`,
+                    'X-Idempotency-Key': idempotencyKey
                 },
                 body: JSON.stringify(orderPayload)
             });
 
             const orderData = await orderRes.json();
+            console.log(`📡 Status da Orders API: ${orderRes.status}`, orderData);
 
             if (orderRes.ok && (orderData.id || orderData.transactions)) {
-                console.log('✅ Pedido PIX gerado via Orders API! ID:', orderData.id);
+                console.log('✅ Pedido PIX gerado via Orders API com sucesso! ID:', orderData.id);
                 const paymentTx = orderData.transactions?.payments?.[0];
                 paymentId = paymentTx?.id || orderData.id;
                 paymentStatus = paymentTx?.status || orderData.status || 'pending';
@@ -124,11 +134,13 @@ app.post('/api/processar-pagamento', async (req, res) => {
                 qrCodeBase64 = paymentTx?.payment_method?.qr_code_base64 || '';
                 mpResponse = orderData;
             } else {
-                console.warn('⚠️ Resposta da Orders API:', orderRes.status, orderData);
-                throw new Error(orderData.message || (orderData.cause && orderData.cause[0]?.description) || 'Falha na Orders API');
+                ordersErrorDetail = orderData;
+                const errMsg = orderData.message || (orderData.cause && orderData.cause[0]?.description) || JSON.stringify(orderData);
+                throw new Error(`Orders API erro (${orderRes.status}): ${errMsg}`);
             }
         } catch (ordersErr) {
-            console.warn('⚠️ Tentando fallback para Payments API (/v1/payments)... Motivo:', ordersErr.message);
+            console.warn('⚠️ Falha na Orders API:', ordersErr.message);
+            console.warn('⚠️ Tentando fallback para Payments API (/v1/payments)...');
 
             // 2. Fallback para Payments API legada (/v1/payments)
             const paymentData = {
@@ -200,7 +212,8 @@ app.post('/api/processar-pagamento', async (req, res) => {
         console.error('❌ Erro no processamento do pagamento:', error);
         res.status(500).json({
             error: 'Erro ao processar pagamento',
-            message: error.message || 'Erro interno no servidor'
+            message: error.message || 'Erro interno no servidor',
+            orders_error: ordersErrorDetail
         });
     }
 });

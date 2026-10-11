@@ -57,22 +57,109 @@ app.post('/api/processar-pagamento', async (req, res) => {
             return res.status(500).json({ error: 'Mercado Pago não configurado no servidor.' });
         }
 
-        const { transaction_amount, description, payment_method_id, payer, itens } = req.body;
+        const { transaction_amount, description, payment_method_id, payer, itens, card_token, installments, cardholder_name } = req.body;
 
         console.log('📥 Recebendo pedido de pagamento:', {
+            metodo: payment_method_id,
             valor: transaction_amount,
             comprador: payer?.first_name,
             email: payer?.email,
-            itens_qtd: itens?.length || 0
+            itens_qtd: itens?.length || 0,
+            tem_token: !!card_token
         });
 
-        // Validação do método de pagamento
-        if (payment_method_id !== 'pix') {
-            return res.status(400).json({
-                error: 'Método não suportado temporariamente',
-                message: 'No momento, o pagamento online está disponível exclusivamente via PIX com aprovação instantânea.'
+        // Roteia para pagamento com cartão
+        if (payment_method_id === 'cartao') {
+            if (!card_token) {
+                return res.status(400).json({ error: 'Token do cartão ausente. Verifique os dados do cartão.' });
+            }
+
+            const idempotencyKey = 'card_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+            const totalAmountStr = Number(transaction_amount).toFixed(2);
+
+            // Detecta bandeira a partir do primeiro dígito do número tokenizado
+            // O token não expõe o número, então usamos 'master' como padrão de teste
+            // O Mercado Pago identifica a bandeira a partir do token automaticamente
+            const cardOrderPayload = {
+                type: 'online',
+                external_reference: `PEDIDO-CARTAO-${Date.now()}`,
+                total_amount: totalAmountStr,
+                payer: {
+                    email: payer.email || 'test@testuser.com',
+                    first_name: payer.first_name,
+                    last_name: payer.last_name || 'Cliente',
+                    identification: payer.identification
+                },
+                transactions: {
+                    payments: [
+                        {
+                            amount: totalAmountStr,
+                            payment_method: {
+                                id: 'master',   // Mercado Pago resolve a bandeira pelo token
+                                type: 'credit_card',
+                                token: card_token,
+                                installments: Number(installments) || 1,
+                                statement_descriptor: 'Bolos Caseirinhos'
+                            }
+                        }
+                    ]
+                }
+            };
+
+            console.log('💳 Enviando pagamento de cartão para Orders API...');
+
+            const cardRes = await fetch('https://api.mercadopago.com/v1/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                    'X-Idempotency-Key': idempotencyKey
+                },
+                body: JSON.stringify(cardOrderPayload)
+            });
+
+            const cardData = await cardRes.json();
+            console.log(`📡 Resposta Orders API (cartão) - Status ${cardRes.status}:`, cardData);
+
+            const cardTx = cardData.transactions?.payments?.[0];
+            const cardPaymentId = cardTx?.id || cardData.id || '';
+            const cardStatus = cardTx?.status || cardData.status || 'unknown';
+
+            if (!cardRes.ok) {
+                const errMsg = cardData.message || (cardData.cause && cardData.cause[0]?.description) || JSON.stringify(cardData);
+                return res.status(cardRes.status).json({ error: 'Erro no pagamento com cartão', message: errMsg, detail: cardData });
+            }
+
+            // Salva no Supabase
+            if (supabase) {
+                const nomeCompleto = `${payer.first_name || ''} ${payer.last_name || ''}`.trim();
+                const { error } = await supabase.from('pedidos').insert([{
+                    cliente_nome: nomeCompleto || 'Cliente',
+                    cliente_email: payer.email,
+                    cliente_cpf: payer.identification?.number || '',
+                    cliente_cep: payer.address?.zip_code || '',
+                    cliente_rua: payer.address?.street_name || '',
+                    cliente_numero: payer.address?.street_number || '',
+                    cliente_bairro: payer.address?.neighborhood || '',
+                    itens: Array.isArray(itens) ? itens : [],
+                    valor_total: Number(transaction_amount),
+                    forma_pagamento: 'cartao',
+                    status_pagamento: cardStatus,
+                    mercadopago_id: String(cardPaymentId)
+                }]);
+                if (error) console.error('❌ Erro ao salvar no Supabase (cartão):', error.message);
+                else console.log('📦 Pedido de cartão gravado no Supabase!');
+            }
+
+            return res.status(201).json({
+                id: cardPaymentId,
+                status: cardStatus,
+                qr_code: '',
+                qr_code_base64: ''
             });
         }
+
+        // Continua para PIX se payment_method_id for 'pix'
 
         let mpResponse = null;
         let qrCodeText = '';

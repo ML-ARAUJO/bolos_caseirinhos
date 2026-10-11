@@ -339,11 +339,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     subtotal: Number((quantidades[b.id] * b.preco).toFixed(2))
                 }));
 
-            // Payload formatado para o Backend Node.js
+            // Payload base
             const payload = {
                 transaction_amount: Number(totalFinal.toFixed(2)),
                 description: 'Pedido Bolos Caseirinhos',
-                payment_method_id: 'pix',
+                payment_method_id: metodoPagamento,
                 itens: itensComprados,
                 payer: {
                     email: email,
@@ -361,6 +361,55 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             };
+
+            // Se cartão, tokeniza antes de enviar
+            if (metodoPagamento === 'cartao') {
+                const numeroCartao = document.getElementById('cartaoNumero')?.value?.replace(/\s/g, '');
+                const titular = document.getElementById('cartaoTitular')?.value?.trim();
+                const validade = document.getElementById('cartaoValidade')?.value?.trim();
+                const cvv = document.getElementById('cartaoCVV')?.value?.trim();
+                const parcelas = document.getElementById('cartaoParcelas')?.value || '1';
+
+                if (!numeroCartao || !titular || !validade || !cvv) {
+                    alert('⚠️ Preencha todos os dados do cartão antes de confirmar.');
+                    return;
+                }
+
+                const [mesVal, anoVal] = validade.split('/');
+                if (!mesVal || !anoVal) {
+                    alert('⚠️ Validade inválida. Use o formato MM/AA.');
+                    return;
+                }
+
+                // PUBLIC KEY de teste do Mercado Pago (credenciais de teste da aplicação)
+                const MP_PUBLIC_KEY = 'APP_USR-a4e07b5f-5a28-4f8e-a98c-4478f3082a33';
+
+                try {
+                    const mp = new MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
+                    const cardToken = await mp.createCardToken({
+                        cardNumber: numeroCartao,
+                        cardholderName: titular,
+                        cardExpirationMonth: mesVal.padStart(2, '0'),
+                        cardExpirationYear: anoVal.length === 2 ? '20' + anoVal : anoVal,
+                        securityCode: cvv,
+                        identificationType: 'CPF',
+                        identificationNumber: cpf.replace(/\D/g, '')
+                    });
+
+                    if (!cardToken || !cardToken.id) {
+                        throw new Error('Não foi possível gerar o token do cartão.');
+                    }
+
+                    payload.card_token = cardToken.id;
+                    payload.installments = Number(parcelas);
+                    payload.cardholder_name = titular;
+
+                } catch (tokenErr) {
+                    console.error('Erro ao tokenizar cartão:', tokenErr);
+                    alert('❌ Erro ao processar dados do cartão: ' + (tokenErr.message || 'Verifique os dados e tente novamente.'));
+                    return;
+                }
+            }
 
             if (btnFinalizarPagamento) {
                 btnFinalizarPagamento.disabled = true;
@@ -409,8 +458,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else {
                             alert('✅ Pedido PIX gerado com sucesso! ID Mercado Pago: ' + resultado.id);
                         }
+                    } else if (metodoPagamento === 'cartao') {
+                        const statusMap = {
+                            'approved': '✅ Pagamento com cartão APROVADO! ID: ' + resultado.id,
+                            'action_required': '⏳ Pagamento em análise (ação requerida). ID: ' + resultado.id,
+                            'pending': '⏳ Pagamento pendente. ID: ' + resultado.id,
+                            'rejected': '❌ Pagamento RECUSADO. Motivo: ' + (resultado.status_detail || 'Verifique os dados do cartão.'),
+                            'cancelled': '❌ Pagamento cancelado.'
+                        };
+                        alert(statusMap[resultado.status] || '✅ Pedido registrado! Status: ' + resultado.status + ' | ID: ' + resultado.id);
                     } else {
-                        alert('✅ Pagamento processado com sucesso via Mercado Pago! Status: ' + resultado.status);
+                        alert('✅ Pagamento processado! Status: ' + resultado.status);
                     }
                 } else {
                     alert('⚠️ Erro ao processar pagamento: ' + (resultado.message || resultado.error || 'Verifique se o backend está rodando.'));

@@ -74,31 +74,87 @@ app.post('/api/processar-pagamento', async (req, res) => {
             });
         }
 
-        // Estrutura o payload para a API do Mercado Pago
-        const paymentData = {
-            body: {
-                transaction_amount: Number(transaction_amount),
-                description: description || 'Pedido Bolos Caseirinhos',
-                payment_method_id: 'pix',
-                notification_url: 'https://bolos-caseirinhos.onrender.com/api/webhooks/mercadopago',
+        let mpResponse = null;
+        let qrCodeText = '';
+        let qrCodeBase64 = '';
+        let paymentId = '';
+        let paymentStatus = 'pending';
+
+        // 1. Tenta gerar via Orders API (/v1/orders) - padrão do novo Checkout Transparente via Orders
+        try {
+            console.log('🔄 Tentando criar PIX via Orders API (/v1/orders)...');
+            const orderPayload = {
+                type: 'online',
+                external_reference: `PEDIDO-${Date.now()}`,
+                total_amount: Number(transaction_amount).toFixed(2),
                 payer: {
-                    email: payer.email,
-                    first_name: payer.first_name,
-                    last_name: payer.last_name || 'Cliente',
-                    identification: payer.identification,
-                    address: payer.address
+                    email: payer.email || 'test_user_br@testuser.com',
+                    first_name: payer.first_name || 'APRO'
+                },
+                transactions: {
+                    payments: [
+                        {
+                            amount: Number(transaction_amount).toFixed(2),
+                            payment_method: {
+                                id: 'pix',
+                                type: 'bank_transfer'
+                            }
+                        }
+                    ]
                 }
+            };
+
+            const orderRes = await fetch('https://api.mercadopago.com/v1/orders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify(orderPayload)
+            });
+
+            const orderData = await orderRes.json();
+
+            if (orderRes.ok && (orderData.id || orderData.transactions)) {
+                console.log('✅ Pedido PIX gerado via Orders API! ID:', orderData.id);
+                const paymentTx = orderData.transactions?.payments?.[0];
+                paymentId = paymentTx?.id || orderData.id;
+                paymentStatus = paymentTx?.status || orderData.status || 'pending';
+                qrCodeText = paymentTx?.payment_method?.qr_code || '';
+                qrCodeBase64 = paymentTx?.payment_method?.qr_code_base64 || '';
+                mpResponse = orderData;
+            } else {
+                console.warn('⚠️ Resposta da Orders API:', orderRes.status, orderData);
+                throw new Error(orderData.message || (orderData.cause && orderData.cause[0]?.description) || 'Falha na Orders API');
             }
-        };
+        } catch (ordersErr) {
+            console.warn('⚠️ Tentando fallback para Payments API (/v1/payments)... Motivo:', ordersErr.message);
 
-        // Gera o pagamento no Mercado Pago
-        const mpResponse = await paymentClient.create(paymentData);
+            // 2. Fallback para Payments API legada (/v1/payments)
+            const paymentData = {
+                body: {
+                    transaction_amount: Number(transaction_amount),
+                    description: description || 'Pedido Bolos Caseirinhos',
+                    payment_method_id: 'pix',
+                    notification_url: 'https://bolos-caseirinhos.onrender.com/api/webhooks/mercadopago',
+                    payer: {
+                        email: payer.email,
+                        first_name: payer.first_name,
+                        last_name: payer.last_name || 'Cliente',
+                        identification: payer.identification,
+                        address: payer.address
+                    }
+                }
+            };
 
-        console.log('✅ Pagamento gerado no Mercado Pago! ID:', mpResponse.id);
-
-        // Extrai dados do PIX
-        const qrCodeText = mpResponse.point_of_interaction?.transaction_data?.qr_code || '';
-        const qrCodeBase64 = mpResponse.point_of_interaction?.transaction_data?.qr_code_base64 || '';
+            const legacyResponse = await paymentClient.create(paymentData);
+            console.log('✅ Pagamento gerado via Payments API! ID:', legacyResponse.id);
+            paymentId = legacyResponse.id;
+            paymentStatus = legacyResponse.status || 'pending';
+            qrCodeText = legacyResponse.point_of_interaction?.transaction_data?.qr_code || '';
+            qrCodeBase64 = legacyResponse.point_of_interaction?.transaction_data?.qr_code_base64 || '';
+            mpResponse = legacyResponse;
+        }
 
         // Se o Supabase estiver configurado, salva o pedido na tabela 'pedidos' com os itens
         let pedidoSalvo = null;
@@ -118,8 +174,8 @@ app.post('/api/processar-pagamento', async (req, res) => {
                     itens: Array.isArray(itens) ? itens : [],
                     valor_total: Number(transaction_amount),
                     forma_pagamento: payment_method_id || 'pix',
-                    status_pagamento: mpResponse.status || 'pending',
-                    mercadopago_id: String(mpResponse.id)
+                    status_pagamento: paymentStatus || 'pending',
+                    mercadopago_id: String(paymentId)
                 }])
                 .select();
 
@@ -133,8 +189,8 @@ app.post('/api/processar-pagamento', async (req, res) => {
 
         // Retorna a resposta completa para o Front-end
         res.status(201).json({
-            id: mpResponse.id,
-            status: mpResponse.status,
+            id: paymentId,
+            status: paymentStatus,
             qr_code: qrCodeText,
             qr_code_base64: qrCodeBase64,
             pedido_banco: pedidoSalvo

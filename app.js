@@ -391,10 +391,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         const qrCodePix = resultado.qr_code || resultado.point_of_interaction?.transaction_data?.qr_code;
                         const qrCodeBase64 = resultado.qr_code_base64 || resultado.point_of_interaction?.transaction_data?.qr_code_base64;
 
-                        // Exibe a Imagem do QR Code se retornada
-                        if (qrCodeBase64 && imgQrCodePix && containerQrCodeImg) {
-                            imgQrCodePix.src = qrCodeBase64.startsWith('data:') ? qrCodeBase64 : `data:image/png;base64,${qrCodeBase64}`;
-                            containerQrCodeImg.classList.remove('hidden');
+                        // Exibe a Imagem do QR Code se retornada ou gerada a partir da chave PIX
+                        if (imgQrCodePix && containerQrCodeImg) {
+                            if (qrCodeBase64) {
+                                imgQrCodePix.src = qrCodeBase64.startsWith('data:') ? qrCodeBase64 : `data:image/png;base64,${qrCodeBase64}`;
+                                containerQrCodeImg.classList.remove('hidden');
+                            } else if (qrCodePix) {
+                                imgQrCodePix.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCodePix)}`;
+                                containerQrCodeImg.classList.remove('hidden');
+                            }
                         }
 
                         // Exibe a Chave PIX Copia e Cola

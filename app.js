@@ -370,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Determina a URL da API dinamicamente (desenvolvimento local vs produção no Render)
-                const isLocalDev = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5500';
+                const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
                 const apiUrl = isLocalDev
                     ? 'http://localhost:3000/api/processar-pagamento'
                     : 'https://bolos-caseirinhos.onrender.com/api/processar-pagamento';
